@@ -3,7 +3,7 @@ Philip Rodriguez
 Steven Chen
 Ryan Beck
 
-Programming Assignment 3
+Programming Assignment 4
 */
 
 #include <linux/mutex.h>
@@ -133,23 +133,51 @@ static int dev_release(struct inode * inodep, struct file * filep)
 static ssize_t dev_write(struct file * filep, const char * buffer, size_t len, loff_t * offset)
 {
 	int buffer_iterator = 0;
+	int bytes_written = 0;
+	char temp[3];
+	int templateIterator, templateSize=38;
+	char template[] = "Undefeated 2018 National Champions UCF";
+
 
 	// We need to make sure we can have the shared memory to ourselves!
 	mutex_lock(&queueMutex);
-	
-	for (; queueSize < BUFFER_SIZE && buffer_iterator < len; queueSize++)
-	{
-		// Since size_of_message < BUFFER_SIZE, we have a space available at message[size_of_message] to put a byte!
-		queue[(queueFirstByte+queueSize) % BUFFER_SIZE] = buffer[buffer_iterator];
-		buffer_iterator++;
 
-		// Uncomment this to make writes take 1 whole second per byte written. Used to test that the mutex actually locks.
-		// msleep(1000);
+	// While we have space in the queue and something left in the buffer to grab
+	while (queueSize < BUFFER_SIZE && buffer_iterator < len)
+	{
+		// Write the character
+		queue[(queueFirstByte+queueSize)%BUFFER_SIZE] = buffer[buffer_iterator];
+		bytes_written++;
+		buffer_iterator++;
+		queueSize++;
+
+		// Perform the UCF check if applicable
+		if (queueSize >= 3)
+		{
+			// Load the last 3 inserted characters...
+			temp[0] = queue[(queueFirstByte+queueSize-3)%BUFFER_SIZE];
+			temp[1] = queue[(queueFirstByte+queueSize-2)%BUFFER_SIZE];
+			temp[2] = queue[(queueFirstByte+queueSize-1)%BUFFER_SIZE];
+			
+			// Check them
+			if (temp[0]=='U' && temp[1]=='C' && temp[2]=='F')
+			{
+				// We need to write over this thing! Back the queue up! //TODO: ask about bytes_written... how would retroactive work?
+				queueSize -= 3;
+
+				// While there is something in the template to read AND space in the queue...
+				for (templateIterator=0; templateIterator < templateSize && queueSize < BUFFER_SIZE; templateIterator++)
+				{
+					queue[(queueFirstByte+queueSize)%BUFFER_SIZE] = template[templateIterator];
+					queueSize++;
+				}
+			}			
+		}
 	}
 
 	// Now that we are done modifying the shared stuff, we can unlock our mutex!
 	mutex_unlock(&queueMutex);
 
-	printk(KERN_INFO "%zu bytes sent to FIFO write device, %d bytes written.\n", len, buffer_iterator);
+	printk(KERN_INFO "%zu bytes sent to FIFO write device, %d bytes written.\n", len, bytes_written);
 	return len;
 }

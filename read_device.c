@@ -3,7 +3,7 @@ Philip Rodriguez
 Steven Chen
 Ryan Beck
 
-Programming Assignment 3
+Programming Assignment 4
 */
 
 #include <linux/mutex.h>
